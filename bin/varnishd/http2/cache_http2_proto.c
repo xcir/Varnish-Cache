@@ -179,6 +179,7 @@ h2_new_req(const struct worker *wrk, struct h2_sess *h2,
 	VTAILQ_INSERT_TAIL(&h2->streams, r2, list);
 	Lck_Unlock(&h2->sess->mtx);
 	h2->refcnt++;
+VSLb(h2->vsl, SLT_VCL_Log, "H2REFCNT-INCR: h2:%d", h2->refcnt);
 	return (r2);
 }
 
@@ -197,6 +198,7 @@ h2_del_req(struct worker *wrk, const struct h2_req *r2)
 	Lck_Lock(&sp->mtx);
 	assert(h2->refcnt > 0);
 	--h2->refcnt;
+VSLb(h2->vsl, SLT_VCL_Log, "H2REFCNT-DECR: h2:%d", h2->refcnt);
 	/* XXX: PRIORITY reshuffle */
 	VTAILQ_REMOVE(&h2->streams, r2, list);
 	Lck_Unlock(&sp->mtx);
@@ -634,7 +636,7 @@ h2_rx_headers(struct worker *wrk, struct h2_sess *h2, struct h2_req *r2)
 	if (r2 == NULL) {
 		if (h2->rxf_stream <= h2->highest_stream)
 			return (H2CE_PROTOCOL_ERROR);	// rfc7540,l,1153,1158
-		if (h2->refcnt >= h2->local_settings.max_concurrent_streams) {
+		if (h2->refcnt > h2->local_settings.max_concurrent_streams) {
 			VSLb(h2->vsl, SLT_Debug,
 			     "H2: stream %u: Hit maximum number of "
 			     "concurrent streams", h2->rxf_stream);

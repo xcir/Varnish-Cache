@@ -353,6 +353,7 @@ h2_new_session(struct worker *wrk, void *arg)
 	h2 = h2_init_sess(wrk, sp, &h2s,
 	    req->err_code == H2_PU_MARKER ? req : NULL, &decode);
 	h2->req0 = h2_new_req(wrk, h2, 0, NULL);
+VSLb(h2->vsl, SLT_VCL_Log, "H2:h2_newreq");
 	AZ(h2->htc->priv);
 	h2->htc->priv = h2;
 
@@ -362,6 +363,7 @@ h2_new_session(struct worker *wrk, void *arg)
 		h2_del_sess(wrk, h2, SC_RX_JUNK);
 		return;
 	}
+VSLb(h2->vsl, SLT_VCL_Log, "H2:h2_ou_session");
 	assert(HTC_S_COMPLETE == H2_prism_complete(h2->htc));
 	HTC_RxPipeline(h2->htc, h2->htc->rxbuf_b + sizeof(H2_prism));
 	WS_Reset(h2->ws, 0);
@@ -378,13 +380,14 @@ h2_new_session(struct worker *wrk, void *arg)
 	AN(h2->ws->r);
 	H2_Send_Frame(wrk, h2,
 	    H2_F_SETTINGS, H2FF_NONE, l, 0, settings);
+VSLb(h2->vsl, SLT_VCL_Log, "H2:SEND SETTINGS");
 	AN(h2->ws->r);
 	H2_Send_Rel(h2, h2->req0);
 	AN(h2->ws->r);
 
 	/* and off we go... */
 	h2->cond = &wrk->cond;
-
+VSLb(h2->vsl, SLT_VCL_Log, "H2:RXF");
 	while (h2_rxframe(wrk, h2)) {
 		WS_Reset(h2->ws, 0);
 		HTC_RxInit(h2->htc, h2->ws);
