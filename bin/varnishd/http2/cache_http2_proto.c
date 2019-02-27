@@ -184,7 +184,7 @@ VSLb(h2->vsl, SLT_VCL_Log, "H2REFCNT-INCR: h2:%d", h2->refcnt);
 }
 
 void
-h2_del_req(struct worker *wrk, const struct h2_req *r2)
+h2_del_req(struct worker *wrk, const struct h2_req *r2, int decr)
 {
 	struct h2_sess *h2;
 	struct sess *sp;
@@ -196,9 +196,12 @@ h2_del_req(struct worker *wrk, const struct h2_req *r2)
 	ASSERT_RXTHR(h2);
 	sp = h2->sess;
 	Lck_Lock(&sp->mtx);
-	assert(h2->refcnt > 0);
-	--h2->refcnt;
+	if(decr){
+		assert(h2->refcnt > 0);
+		--h2->refcnt;
 VSLb(h2->vsl, SLT_VCL_Log, "H2REFCNT-DECR: h2:%d", h2->refcnt);
+	}
+
 	/* XXX: PRIORITY reshuffle */
 	VTAILQ_REMOVE(&h2->streams, r2, list);
 	Lck_Unlock(&sp->mtx);
@@ -215,6 +218,9 @@ h2_kill_req(struct worker *wrk, const struct h2_sess *h2,
 	ASSERT_RXTHR(h2);
 	AN(h2e);
 	Lck_Lock(&h2->sess->mtx);
+	assert(h2->refcnt > 0);
+	--r2->h2sess->refcnt;
+
 	VSLb(h2->vsl, SLT_Debug, "KILL st=%u state=%d", r2->stream, r2->state);
 	if (r2->error == NULL)
 		r2->error = h2e;
@@ -228,7 +234,7 @@ h2_kill_req(struct worker *wrk, const struct h2_sess *h2,
 	}
 	Lck_Unlock(&h2->sess->mtx);
 	if (r2 != NULL)
-		h2_del_req(wrk, r2);
+		h2_del_req(wrk, r2, 0);
 }
 
 /**********************************************************************/
@@ -579,7 +585,7 @@ h2_end_headers(struct worker *wrk, struct h2_sess *h2,
 		VSLb(h2->vsl, SLT_Debug, "HPACK/FINI %s", h2e->name);
 		Lck_Unlock(&h2->sess->mtx);
 		AZ(r2->req->ws->r);
-		h2_del_req(wrk, r2);
+		h2_del_req(wrk, r2, 1);
 		return (h2e);
 	}
 	VSLb_ts_req(req, "Req", req->t_req);
@@ -694,7 +700,7 @@ h2_rx_headers(struct worker *wrk, struct h2_sess *h2, struct h2_req *r2)
 		Lck_Unlock(&h2->sess->mtx);
 		(void)h2h_decode_fini(h2);
 		AZ(r2->req->ws->r);
-		h2_del_req(wrk, r2);
+		h2_del_req(wrk, r2, 1);
 		return (h2e);
 	}
 
@@ -729,7 +735,7 @@ h2_rx_continuation(struct worker *wrk, struct h2_sess *h2, struct h2_req *r2)
 		Lck_Unlock(&h2->sess->mtx);
 		(void)h2h_decode_fini(h2);
 		AZ(r2->req->ws->r);
-		h2_del_req(wrk, r2);
+		h2_del_req(wrk, r2, 1);
 		return (h2e);
 	}
 	if (h2->rxf_flags & H2FF_HEADERS_END_HEADERS)
@@ -1021,13 +1027,13 @@ h2_sweep(struct worker *wrk, struct h2_sess *h2)
 		switch (r2->state) {
 		case H2_S_CLOSED:
 			if (!r2->scheduled)
-				h2_del_req(wrk, r2);
+				h2_del_req(wrk, r2, 1);
 			break;
 		case H2_S_CLOS_REM:
 			if (!r2->scheduled) {
 				h2_tx_rst(wrk, h2, h2->req0, r2->stream,
 				    H2SE_REFUSED_STREAM);
-				h2_del_req(wrk, r2);
+				h2_del_req(wrk, r2, 1);
 				continue;
 			}
 			/* FALLTHROUGH */

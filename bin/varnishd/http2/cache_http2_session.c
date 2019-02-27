@@ -296,7 +296,7 @@ h2_ou_session(struct worker *wrk, struct h2_sess *h2,
 	if (hs != HTC_S_COMPLETE) {
 		VSLb(h2->vsl, SLT_Debug, "H2: No/Bad OU PRISM (hs=%d)", hs);
 		r2->scheduled = 0;
-		h2_del_req(wrk, r2);
+		h2_del_req(wrk, r2, 1);
 		return (0);
 	}
 	XXXAZ(Pool_Task(wrk->pool, &req->task, TASK_QUEUE_REQ));
@@ -359,7 +359,7 @@ VSLb(h2->vsl, SLT_VCL_Log, "H2:h2_newreq");
 
 	if (req->err_code == H2_OU_MARKER && !h2_ou_session(wrk, h2, req)) {
 		assert(h2->refcnt == 1);
-		h2_del_req(wrk, h2->req0);
+		h2_del_req(wrk, h2->req0, 1);
 		h2_del_sess(wrk, h2, SC_RX_JUNK);
 		return;
 	}
@@ -431,7 +431,7 @@ VSLb(h2->vsl, SLT_VCL_Log, "H2:RXF");
 	}
 	h2->cond = NULL;
 	assert(h2->refcnt == 1);
-	h2_del_req(wrk, h2->req0);
+	h2_del_req(wrk, h2->req0, 1);
 	/* TODO: proper sess close reason */
 	h2_del_sess(wrk, h2, SC_RX_JUNK);
 }

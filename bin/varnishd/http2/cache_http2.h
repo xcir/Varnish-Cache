@@ -227,7 +227,7 @@ void H2_Send(struct worker *, struct h2_req *,
 /* cache_http2_proto.c */
 struct h2_req * h2_new_req(const struct worker *, struct h2_sess *,
     unsigned stream, struct req *);
-void h2_del_req(struct worker *, const struct h2_req *);
+void h2_del_req(struct worker *, const struct h2_req *, int decr);
 void h2_kill_req(struct worker *, const struct h2_sess *,
     struct h2_req *, h2_error);
 int h2_rxframe(struct worker *, struct h2_sess *);
