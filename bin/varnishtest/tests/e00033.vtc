@@ -29,7 +29,7 @@ client c1 {
 } -run
 
 shell -match "^1$" "varnishncsa -n ${v1_name}  -d | wc -l"
-shell -match "^1$" "varnishncsa -n ${v1_name}  -d -e -q 'requrl ~ /esi ' | wc -l"
+shell -match "^1$" "varnishncsa -n ${v1_name}  -d -e -q \"requrl ~ '/esi'\" | wc -l"
 
 
 
